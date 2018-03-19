@@ -19,14 +19,14 @@ int main(int argc, char const *argv[]) {
 
   // client connect to server
   memset(&hints, 0, sizeof hints);
-  setHints(&hints, FALSE);
+  set_hints(&hints, FALSE);
 
   if (getaddrinfo(ip, port, &hints, &servinfo) != 0) {
     cout << "ERR! getaddrinfo" << endl;
     return 0;
   }
 
-  serverfd = runClient(&p, servinfo);
+  serverfd = run_client(&p, servinfo);
   freeaddrinfo(servinfo);
   if (p == NULL) {
     cout << "ERR! failed to connect " << endl;
@@ -34,8 +34,8 @@ int main(int argc, char const *argv[]) {
   }
   cout << "connecting to server on port " << port << endl;
 
-  string buffer = produceBuffer(5, (string)INIT, username, args[3], args[4], args[5]);
-  sendAll(serverfd, (char *)buffer.c_str(), buffer.length());
+  string buffer = produce_buffer(5, (string)INIT, username, args[3], args[4], args[5]);
+  send_all(serverfd, (char *)buffer.c_str(), buffer.length());
   int nbytes = recv(serverfd, serverRes, CHUNK_SIZE, 0);
   cout << "Server: " << serverRes << endl;
   close(serverfd);
