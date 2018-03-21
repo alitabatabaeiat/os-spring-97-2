@@ -90,21 +90,22 @@ void write_in_named_pipe(string str) {
   }
 }
 
-bool open_dir(string path, vector<string> &files) {
+vector<string> open_dir(string path) {
+  vector<string> files;
   struct dirent *pDirent;
   DIR *pDir = opendir((path + "/").c_str());
 
   if(pDir == NULL)
-    return false;
+    return NULL;
   while ((pDirent = readdir(pDir)) != NULL)
     if(strcmp(pDirent->d_name, ".") != 0 && strcmp(pDirent->d_name, "..") != 0)
       files.push_back(pDirent->d_name);
   closedir (pDir);
-  return true;
+  return files;
 }
 
-string get_file_score(string dir, vector<string> p1, vector<string> p2, vector<string> p3) {
-    int sum = 0;
+double get_file_score(string dir, vector<string> p1, vector<string> p2, vector<string> p3) {
+    double sum = 0;
     ifstream file(dir.c_str());
     if(file.is_open()) {
       string candidate;
@@ -113,48 +114,32 @@ string get_file_score(string dir, vector<string> p1, vector<string> p2, vector<s
         file.close();
         cout << "sum in file " << dir << ": " << sum << endl;
     }
-    return itoa(sum);
+    return sum;
 }
 
 string solve(string base_dir, vector<string> p1, vector<string> p2, vector<string> p3) {
-    string sum;
-    vector<string> files;
-    bool is_dir = open_dir(base_dir, files);
-    // cout << base_dir << ": " << is_dir << endl;
+    double sum;
+    vector<string> files = open_dir(base_dir, files);
     int pipefds[files.size()][2];
     int piperet[files.size()];
+    vector<string> scores;
 
-    for(int i = 0; i < files.size() || !is_dir; i++) {
-      piperet[i] = pipe(pipefds[i]);
+    for(int i = 0; i < files.size(); i++) {
+      if (pipe(pipefds[i]) == -1)
+        cout << "ERR! pipe (" << strerror(errno) << ")" << endl;
       if(fork() == 0) {
-        // cout << base_dir << ": " << is_dir << endl;
-
-          // calculate sum here and send it to parent
-
-        if(is_dir) {
-          // cout << base_dir + "/" + files[i] << endl;
-          sum = solve(base_dir + "/" + files[i], p1, p2, p3);
-          // cout << "acc sum : " << sum << endl;
-          piperet[i] = write(pipefds[i][1], sum.c_str(), sum.length());
+        if(files[i].find(".txt") == -1) {
+          solve(base_dir + "/" + files[i], p1, p2, p3);
+          char buf[CHUNK_SIZE] = {0};
+          read(pipefds[i][0], buf, CHUNK_SIZE);
+          kill(pid, SIGKILL);
+          scores.push_back(buf);
         } else { // its a file
-          cout << base_dir << endl;
           sum = get_file_score(base_dir, p1, p2, p3);
-          cout << base_dir << " -> " << sum << endl;
-          piperet[i] = write(pipefds[i][1], sum.c_str(), sum.length());
+          string buf = base_dir + " " + to_string(sum);
+          cout << buf << endl;
+          piperet[i] = write(pipefds[i][1], buf.c_str(), buf.length());
         }
-
-        if(piperet[i] != sum.length()){
-          cout << getpid() << ": ";
-          cout << "pipe did not send the expected value!" << endl;
-
-          cout << getpid() << ": ";
-          cout << sum << " " << piperet[i] << endl;
-          exit(2);
-        } else if(piperet[i] == -1){
-          cout << "ERROR writing" << endl;
-        }
-        exit(0);
-        // send sum to father
       }
     }
 
@@ -203,16 +188,16 @@ string normalize_candidate(string candidate, int start_to, int end_from) {
 	return res;
 }
 
-void find_word(string candidate, vector<string> p1, vector<string> p2, vector<string> p3, int &sum) {
+void find_word(string candidate, vector<string> p1, vector<string> p2, vector<string> p3, double &sum) {
 	candidate = lowercase(candidate);
   int state = 1;
   for (int i = 0; i < (p1.size() + p2.size() + p3.size()); i++) {
     if (i == p1.size()) state = 2;
-    else if (i == p2.size()) state = 3;
+    else if (i == p1.size() + p2.size()) state = 3;
     string word;
     if (state == 1) word = p1[i];
     else if (state == 2) word = p2[i - p1.size()];
-    else if (state == 3) word = p3[i - p2.size()];
+    else if (state == 3) word = p3[i - (p1.size() + p2.size())];
     int x = candidate.find(word);
     if (x == -1)
       continue;
