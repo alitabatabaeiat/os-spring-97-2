@@ -1,0 +1,15 @@
+data/univ1/comp/2006/Automated Brute Forcing on web-based login.txt 0
+data/univ1/comp/2010/bci.txt 0
+data/univ1/comp/2010/Is your Web Application Secure Enough.txt 0
+data/univ1/mech/How to Mentor Young Engineers.txt 0
+data/univ1/mech/Petal Power Boosts Solar Cell Capacity.txt 0
+data/univ1/chemistry/A groovy science activity from Science Buddies.txt 0
+data/univ1/chemistry/No Stain-No Pain.txt 0
+data/univ2/Energy/2015/1/Blowing with the Wind.txt 0
+data/univ2/comp/1/Javascript/New features of JavaScript Arrays with ES2015.txt 0
+data/univ2/chemistry/Fungi Can Help Concrete Heal Its Own Cracks.txt 0
+data/univ1/comp/2006/Cookie Tracking and Stealing using Cross-Site Scripting.txt 1
+data/univ2/Energy/2015/2/Using AI to Manage  the Grid.txt 2
+data/univ2/comp/1/computerNetworks/Internet Control Message Protocol.txt 2
+data/univ2/comp/2/network/Longest Prefix Matching in Routers.txt 4
+data/univ2/comp/2/network/LAN Technologies.txt 9

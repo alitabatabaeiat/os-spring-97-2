@@ -22,7 +22,6 @@ int  main(int argc, char const *argv[]) {
   char buffer[CHUNK_SIZE] = {0};
   vector<int> workers_pid;
   vector<int> workers_state(num_of_workers, IDLE);
-  vector<string> clients;
   int pipefds[num_of_workers][2];
 
   if (mkfifo(PIPE_NAME, 0666) != 0 && errno != EEXIST)
@@ -102,7 +101,6 @@ int  main(int argc, char const *argv[]) {
             if (input == QUIT)
               quit = true;
           } else {
-            cout << i;
             int nbytes;
             if ((nbytes = recv(i, buffer, CHUNK_SIZE, 0)) <= 0) {
               if (nbytes == 0) {
@@ -113,25 +111,24 @@ int  main(int argc, char const *argv[]) {
               close(i);
               FD_CLR(i, &master);
             } else {
-              string message(buffer);
-              vector<string> tokens = tokenize_words(buffer, ";");
+              string message = buffer;
+              vector<string> tokens = tokenize_words(message, ";");
               if (tokens[0] == INIT) {
-                clients.push_back(tokens[1]);
+                string username = tokens[1];
                 vector<string> p1 = tokenize_words(tokens[2], ",");
                 vector<string> p2 = tokenize_words(tokens[3], ",");
                 vector<string> p3 = tokenize_words(tokens[4], ",");
-                string info = clients.back() + ": " + itoa(p1.size() + p2.size() + p3.size());
+                string info = username + ": " + itoa(p1.size() + p2.size() + p3.size());
                 write_in_named_pipe(info);
                 bool worker_found = false;
-                for (int i = 0; i < workers_pid.size(); i++) {
-                  if (workers_state[i] == BUSY) {
+                for (int j = 0; j < workers_pid.size(); j++) {
+                  if (workers_state[j] == BUSY) {
                     continue;
                   }
                   worker_found = true;
-                  workers_state[i] = BUSY;
-                  string buf = tokens[2] + ";" + tokens[3] + ";" + tokens[4];
-                  write(pipefds[i][1], buf.c_str(), buf.length());
-                  cout << "buf: " << buf << endl;
+                  workers_state[j] = BUSY;
+                  string buf = itoa(i) + ";" + tokens[2] + ";" + tokens[3] + ";" + tokens[4];
+                  write(pipefds[j][1], buf.c_str(), buf.length());
                   break;
                 }
                 if (!worker_found) {
@@ -152,10 +149,19 @@ int  main(int argc, char const *argv[]) {
       char buf[CHUNK_SIZE] = {0};
       read(pipefds[workers_pid.size() - 1][0], buf, CHUNK_SIZE);
       vector<string> tokens = tokenize_words(buf, ";");
-      vector<string> p1 = tokenize_words(tokens[0], ",");
-      vector<string> p2 = tokenize_words(tokens[1], ",");
-      vector<string> p3 = tokenize_words(tokens[2], ",");
-      solve(db, p1, p2, p3);
+      int clientfd = atoi(tokens[0].c_str());
+      vector<string> p1 = tokenize_words(tokens[1], ",");
+      vector<string> p2 = tokenize_words(tokens[2], ",");
+      vector<string> p3 = tokenize_words(tokens[3], ",");
+      string res = solve(db, p1, p2, p3);
+      vector<string> scores = tokenize_words(res, ";");
+      if (unlink("scores.txt") != 0 && errno != ENOENT)
+        cout << "ERR! unlink (" << strerror(errno) << ")" << endl;
+      ofstream file("scores.txt", ios::app);
+      for (int i = 0; i < scores.size(); i++)
+        file << scores[i] << endl;
+      file.close();
+      send_all(clientfd, (char*)res.c_str(), res.size());
     }
 
   }

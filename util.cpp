@@ -12,6 +12,8 @@ vector<string> normalize_args(int argc, const char *argv[]) {
 
 vector<string> tokenize_words(string str, string delimiter) {
   vector<string> res;
+  if (str.empty())
+    return res;
   int pos;
   while ((pos = str.find(delimiter)) != -1) {
     string token = str.substr(0, pos);
@@ -38,20 +40,16 @@ string produce_buffer(int n, ...) {
   return buffer;
 }
 
-string itoa(int n) {
-    int i, sign;
-    string res;
+string itoa(int number) {
+  ostringstream oss;
+  oss << number;
+  return oss.str();
+}
 
-    if ((sign = n) < 0)
-        n = -n;
-    i = 0;
-    do {
-        res += n % 10 + '0';
-    } while ((n /= 10) > 0);
-    if (sign < 0)
-        res += '-';
-    reverse(res.begin(), res.end());
-    return res;
+string dtoa(double number) {
+  ostringstream oss;
+  oss << number;
+  return oss.str();
 }
 
 void logs_process() {
@@ -67,7 +65,6 @@ void logs_process() {
       read(fifofd, data, CHUNK_SIZE);
       batch.push_back(data);
       close(fifofd);
-      cout << batch.size() << endl;
       if (batch.size() == 5) {
         ofstream logs_file(LOGS_FILE_NAME, ios::app);
         if (logs_file.is_open()) {
@@ -90,88 +87,53 @@ void write_in_named_pipe(string str) {
   }
 }
 
-vector<string> open_dir(string path) {
-  vector<string> files;
-  struct dirent *pDirent;
-  DIR *pDir = opendir((path + "/").c_str());
-
-  if(pDir == NULL)
-    return NULL;
-  while ((pDirent = readdir(pDir)) != NULL)
-    if(strcmp(pDirent->d_name, ".") != 0 && strcmp(pDirent->d_name, "..") != 0)
-      files.push_back(pDirent->d_name);
-  closedir (pDir);
-  return files;
-}
-
-double get_file_score(string dir, vector<string> p1, vector<string> p2, vector<string> p3) {
-    double sum = 0;
-    ifstream file(dir.c_str());
-    if(file.is_open()) {
-      string candidate;
-      while(file >> candidate)
-  			find_word(candidate, p1, p2, p3, sum);
-        file.close();
-        cout << "sum in file " << dir << ": " << sum << endl;
+string find_min(vector<vector<string> > &str) {
+  double min = 1000;
+  int index = -1;
+  for (int i = 0; i < str.size(); i++) {
+    if (str[i].size() == 0) continue;
+    string s = str[i][0];
+    double score = atof(s.substr(s.find_last_of(" ") + 1).c_str());
+    if (score < min) {
+      min = score;
+      index = i;
     }
-    return sum;
+  }
+  if (index != -1) {
+    string s = str[index][0];
+    str[index].erase(str[index].begin());
+    return s;
+  }
+  return "--- MIN NOT FOUND!!!";
 }
 
-string solve(string base_dir, vector<string> p1, vector<string> p2, vector<string> p3) {
-    double sum;
-    vector<string> files = open_dir(base_dir, files);
-    int pipefds[files.size()][2];
-    int piperet[files.size()];
-    vector<string> scores;
-
-    for(int i = 0; i < files.size(); i++) {
-      if (pipe(pipefds[i]) == -1)
-        cout << "ERR! pipe (" << strerror(errno) << ")" << endl;
-      if(fork() == 0) {
-        if(files[i].find(".txt") == -1) {
-          solve(base_dir + "/" + files[i], p1, p2, p3);
-          char buf[CHUNK_SIZE] = {0};
-          read(pipefds[i][0], buf, CHUNK_SIZE);
-          kill(pid, SIGKILL);
-          scores.push_back(buf);
-        } else { // its a file
-          sum = get_file_score(base_dir, p1, p2, p3);
-          string buf = base_dir + " " + to_string(sum);
-          cout << buf << endl;
-          piperet[i] = write(pipefds[i][1], buf.c_str(), buf.length());
-        }
-      }
-    }
-
-    char buffer[CHUNK_SIZE];
-    memset(buffer, '\0', CHUNK_SIZE);
-    for(int i = 0 ; i < files.size() ; i++) {
-
-        piperet[i] = read(pipefds[i][0], buffer, CHUNK_SIZE); /* Read from pipe */
-
-        if(piperet[i] == -1){
-            cout << "ERROR reading pipe" << endl;
-        }
-        if (piperet[i] != strlen(buffer)) {
-            cout << "Read did not return expected value" << endl;
-            exit(4);
-        }
-        string tmpsum = buffer;
-        memset(buffer, '\0', CHUNK_SIZE);
-        sum = add(sum, buffer);
-    }
-    return sum;
+string concat_list(vector<string> l) {
+  vector<vector<string> > tokenized;
+  string res = "";
+  int counter = 0;
+  for (int i = 0; i < l.size(); i++) {
+    tokenized.push_back(tokenize_words(l[i], ";"));
+    counter += tokenized.back().size();
+  }
+  for (int i = 0; i < counter; i++) {
+    string min = find_min(tokenized);
+    if (i == 0)
+      res = min;
+    else
+      res += ";" + min;
+  }
+  return res;
 }
 
-string add(string a, string b) {
-    return itoa(atoi(a.c_str()) + atoi(b.c_str()));
-}
-
-string lowercase(string in) {
-	for (int i = 0 ; i < in.size(); i++)
-  	if (in[i] <= 'Z' && in[i] >= 'A')
-    	in[i] = in[i] - ('Z'-'z');
-  return in;
+vector<string> read_pipes(int pipefds[][2], int size) {
+  vector<string> res(size);
+  for (int i = 0; i < size; i++) {
+    char buf[CHUNK_SIZE] = {0};
+    read(pipefds[i][0], buf, CHUNK_SIZE);
+    string str = buf;
+    res[i] = str;
+  }
+  return res;
 }
 
 string normalize_candidate(string candidate, int start_to, int end_from) {
@@ -188,12 +150,19 @@ string normalize_candidate(string candidate, int start_to, int end_from) {
 	return res;
 }
 
+string lowercase(string in) {
+	for (int i = 0 ; i < in.size(); i++)
+  	if (in[i] <= 'Z' && in[i] >= 'A')
+    	in[i] = in[i] - ('Z'-'z');
+  return in;
+}
+
 void find_word(string candidate, vector<string> p1, vector<string> p2, vector<string> p3, double &sum) {
 	candidate = lowercase(candidate);
   int state = 1;
   for (int i = 0; i < (p1.size() + p2.size() + p3.size()); i++) {
     if (i == p1.size()) state = 2;
-    else if (i == p1.size() + p2.size()) state = 3;
+    if (i == p1.size() + p2.size()) state = 3;
     string word;
     if (state == 1) word = p1[i];
     else if (state == 2) word = p2[i - p1.size()];
@@ -206,7 +175,59 @@ void find_word(string candidate, vector<string> p1, vector<string> p2, vector<st
       else if (state == 2) sum += 1.5;
       else if (state == 3) sum += 1;
     }
+
   }
+}
+
+double get_file_score(string dir, vector<string> p1, vector<string> p2, vector<string> p3) {
+    double sum = 0;
+    ifstream file(dir.c_str());
+    if(file.is_open()) {
+      string candidate;
+      while(file >> candidate)
+  			find_word(candidate, p1, p2, p3, sum);
+      file.close();
+    }
+    return sum;
+}
+
+vector<string> open_dir(string path) {
+  vector<string> files;
+  struct dirent *pDirent;
+  DIR *pDir = opendir((path + "/").c_str());
+
+  if(pDir == NULL)
+    return files;
+  while ((pDirent = readdir(pDir)) != NULL)
+    if(strcmp(pDirent->d_name, ".") != 0 && strcmp(pDirent->d_name, "..") != 0 && strcmp(pDirent->d_name, ".DS_Store") != 0)
+      files.push_back(pDirent->d_name);
+  closedir (pDir);
+  return files;
+}
+
+string solve(string base_dir, vector<string> p1, vector<string> p2, vector<string> p3) {
+    double sum;
+    vector<string> files = open_dir(base_dir);
+    int pipefds[files.size()][2];
+
+    for(int i = 0; i < files.size(); i++) {
+      if (pipe(pipefds[i]) == -1)
+        cout << "ERR! pipe (" << strerror(errno) << ")" << endl;
+      if(fork() == 0) {
+        string buf;
+        if(files[i].find(".txt") == -1) {
+          buf = solve(base_dir + "/" + files[i], p1, p2, p3);
+        } else { // its a file
+          sum = get_file_score(base_dir + "/" + files[i], p1, p2, p3);
+          buf = base_dir + "/" + files[i] + " " + dtoa(sum);
+        }
+        write(pipefds[i][1], buf.c_str(), buf.length());
+        exit(EXIT_SUCCESS);
+      }
+    }
+
+    vector<string> scores = read_pipes(pipefds, files.size());
+    return concat_list(scores);
 }
 
 void *get_in_addr(struct sockaddr *sa) {
