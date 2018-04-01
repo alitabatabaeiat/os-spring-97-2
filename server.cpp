@@ -131,7 +131,7 @@ int  main(int argc, char const *argv[]) {
                   write(pipefds[j][1], buf.c_str(), buf.length());
                   break;
                 }
-                if (!worker_found) {
+                if (!worker_found) { // TODO: remember to handle this
                   cout << "worker not found!" << endl;
                 }
               }
